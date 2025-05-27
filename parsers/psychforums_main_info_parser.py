@@ -45,57 +45,61 @@ def get_html(url, params= ''): #создаем функцию которая в�
 
 def get_content(html,url): #полусение конкретной информации в зависимости от того, какие параметры мы ввели в предыдущую функцию и что нам вернули
     soup = BeautifulSoup(html, 'html.parser') #создаем объект c входными данными
+
     items = soup.find_all('div', class_=re.compile(r"^post bg")) # Еще два часа моей жизни
+
     information_about_separation_anxiety = []
+
     forum_themes = soup.find('div', id="page-footer").find('li', class_="icon-home").find_all('a')
-    #print(items)
-    #print(information_about_separation_anxiety)
-    #print(forum_themes)
     # выносим все эдементы из аппента ибо я замаялась исправлять ошибки
     for item in items:
         #print(item)
         try:
+
             main_theme = forum_themes[2]
             second_theme = forum_themes[3]
             last_theme = forum_themes[4] if len(forum_themes) >= 4 else 'NULL'
-            title = item.find('h1')
+            title = item.find('h3', class_='first')
             text = item.find('div', class_='content')
-            date =  item.find('div', class_='author')
+            date = item.find('p', class_='author')
+            if date:
+                # Получаем весь текст внутри <p>
+                full_text = date.get_text(separator=' ', strip=True)
+                # В этом тексте ищем дату по шаблону или разбираем его
+                # Обычно дата идет после символа "»"
+                parts = full_text.split('»')
+                if len(parts) > 1:
+                    date = parts[1].strip() # Выведет: "Пн Ноя 14, 2022 1:09"
+                else:
+                    print("NULL")
+
             id_user = item.find('dl', class_='postprofile')
-            count_messages = item.find_all('dd')
-            count_messages_value = 0
-            for dd in count_messages:
-                count_text = dd.get_text(strip=True)
-                if 'Сообщений' in count_text:
-                    match = re.search(r'\d+', count_text)
-                    if match:
-                        count_messages_value = int(match.group())
-                        break
+            messages = item.find('dl', class_='postprofile').find_all('dd')
+            count_messages = messages[2].get_text().replace('Posts: ', '')
 
             information_about_separation_anxiety.append(
                 {
                     'main_theme' : main_theme.get_text(strip=True) if main_theme else 'NULL',
-                    'second_theme': second_theme.get_text(strip=True) if second_theme else 'NULL',
+                    'second_theme': second_theme.get_text(strip=True).replace(' Forum', '') if second_theme else 'NULL',
                     'last_theme': last_theme.get_text(strip=True) if last_theme else 'NULL',
                     'title': title.get_text(strip=True) if title else 'NULL',
                     'text': text.get_text(strip=True) if text else 'NULL',
-                    'date': date.find('span').get_text(strip=True) if date else 'NULL',
+                    'date': date if date else 'NULL',
                     'id_user': id_user.get('id') if id_user else 'NULL',
-                    'count_messages_value': count_messages_value
+                    'count_messages': count_messages if count_messages else 'NULL'
                 }
             )
             #print(information_about_separation_anxiety)
         except Exception as e:
             print(f"Ошибка при обработке элемента на странице {url}: {e}")
             continue
-
     return information_about_separation_anxiety
 
 def save_document(items, path):
     with open(path, 'w', encoding='utf-8', newline='') as file:
         writer = csv.writer(file, delimiter= ';')
         for item in items:
-            writer.writerow([item['main_theme'],item['second_theme'],item['last_theme'], item['title'], item['text'], item['date'], item['id_user'], item['count_messages_value']])
+            writer.writerow([item['main_theme'],item['second_theme'],item['last_theme'], item['title'], item['text'], item['date'], item['id_user'], item['count_messages']])
 
 def save_bad_document(items, path):
    with open(path, 'w', newline='') as file:
@@ -106,7 +110,7 @@ def save_bad_document(items, path):
 
 
 def read_from_document():
-    with open(r'D:\Documents\GitHub\Psychic-Parser\links_to_separation_anxiety_info.csv', 'r', newline='') as file:
+    with open(r'D:\Documents\GitHub\Psychic-Parser\parsers\info_about_separation_anxiety.csv', 'r', newline='') as file:
         reader = csv.reader(file)
         next(reader) # 'Это чтоб заголовок пропускать, а то получается у первого ошибка из-за того, что ему передают текст, а не ссылку
         for row in reader:
