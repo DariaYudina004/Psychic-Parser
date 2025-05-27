@@ -7,7 +7,7 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
 
 # Укажите путь к драйверу Chrome
-driver = webdriver.Chrome(executable_path='D:\Documents\GitHub\Psychic-Parser\chromedriver\chromedriver.exe')
+driver = webdriver.Chrome(executable_path='/drivers/chromedriver/chromedriver.exe')
 
 userAgent = UserAgent()
 options = webdriver.ChromeOptions()
