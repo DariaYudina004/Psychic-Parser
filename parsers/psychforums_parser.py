@@ -6,9 +6,10 @@ import csv # создает csv файл
 import random
 import time
 
-CSV = 'links_to_separation_anxiety_info.csv'
+CSV = 'ALL_LINKS.csv'
+BAD_CSV = 'BAD_OF_ALL_LINKS.csv'
 HOST = 'https://www.psychforums.com/forum.html' # домен, который мы парсим
-URL = 'https://www.psychforums.com/separation-anxiety/' #точный адрес страницы
+URLS = [] #точный адрес страницы
 HEADERS = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
     'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
@@ -49,7 +50,8 @@ def get_html(url, params= ''): #создаем функцию которая в�
 def get_content(html, page): #полусение конкретной информации в зависимости от того, какие параметры мы ввели в предыдущую функцию и что нам вернули
    soup = BeautifulSoup(html, 'html.parser') #создаем объект c входными данными
    items = soup.find_all('li', class_=re.compile(r'^row bg')) # минус 3 часа моей жизни
-   links_to_separation_anxiety_info = []
+   ALL_LINKS = []
+
 
    for item in items:
        dt_element = item.find('dl', class_='icon')
@@ -57,41 +59,75 @@ def get_content(html, page): #полусение конкретной инфор
            a_tag = dt_element.find('a')
            if a_tag:
                data_href = a_tag.get('href')
-               links_to_separation_anxiety_info.append({'link_separation_anxiety': data_href})
+               print(data_href)
+               ALL_LINKS.append({'ALL_LINKS_of_psihi': data_href})
            else:
                # Обработка случая, когда <a> не найден
-               links_to_separation_anxiety_info.append({'link_separation_anxiety': None})
+               ALL_LINKS.append({'ALL_LINKS_of_psihi': None})
        else:
            # Обработка случая, когда <dt> не найден
-           links_to_separation_anxiety_info.append({'link_separation_anxiety': None})
+           ALL_LINKS.append({'ALL_LINKS_of_psihi': None})
 
-   return links_to_separation_anxiety_info
+   return ALL_LINKS
 
 def save_document(items, path):
    with open(path, 'w', newline='') as file:
        writer = csv.writer(file, delimiter= ';')
        writer.writerow(['Ссылка на страницу со всей инфой'])
        for item in items:
-           writer.writerow([item['link_separation_anxiety']])
+           writer.writerow([item['ALL_LINKS_of_psihi']])
+
+def save_bad_document(items, path):
+   with open(path, 'w', newline='') as file:
+       writer = csv.writer(file, delimiter= ';')
+       writer.writerow(['Ломанные ссылки'])
+       for item in items:
+           writer.writerow([item])
+
+
+def read_from_document():
+    with open(r'D:\Documents\GitHub\Psychic-Parser\main_links.csv', 'r', newline='') as file:
+        reader = csv.reader(file)
+        next(reader) # 'Это чтоб заголовок пропускать, а то получается у первого ошибка из-за того, что ему передают текст, а не ссылку
+        for row in reader:
+            URLS.append(row)
+
 
 def parser():
-   PAGENATION = input('Укажите количество страниц для парсинга: ')
-   PAGENATION = int(PAGENATION.strip())
-   html = get_html(URL)
-   links_to_separation_anxiety_info = []
-   if html.status_code == 200:
-       for page in range(1, PAGENATION + 1):
-           print(f'пошел парсинг. Страница: {page}' )
-           #url = URL + f'/page-{page}'
-           html = get_html(URL)
-           links_to_separation_anxiety_info.extend(get_content(html.text, page))
-           print(links_to_separation_anxiety_info)
-           time.sleep(random.uniform(1, 3))
-       print(links_to_separation_anxiety_info)
-       print('Парсинг закончен')
-   else:
-       print('Error')
-   if links_to_separation_anxiety_info:
-       save_document(links_to_separation_anxiety_info, CSV)
+   read_from_document()
+   all_links_info = []
+   error_links = []
+   base_url = None
+   for url in range(len(URLS)):
+       try:
+           base_url = URLS[url][0]
+           html = get_html(base_url)
+           soup = BeautifulSoup(html.text, 'html.parser')
+           counts = soup.find('div', class_='pagination').find('a').find_all('strong')
+           PAGENATION = int(counts[1].get_text())
+           for page in range(PAGENATION):
+               if page == 0:
+                   current_url = base_url
+               else:
+                   current_url = f"{base_url}/page{page * 40}.html"
+               print(f'Парсим страницу: {current_url}')
+               html_page = get_html(current_url)
+               if html_page.status_code != 200:
+                   print(f'Ошибка при загрузке {current_url}')
+                   error_links.append(base_url)
+                   print(error_links)
+                   break  # выходим, если страница не загрузилась
+               # Обрабатываем текущую страницу
+               all_links_info.extend(get_content(html_page.text, current_url))
+               save_document(all_links_info, CSV)
+               time.sleep(random.uniform(1, 3))
+       except Exception as e:
+           print(f'У меня нет времени на ошибки. Я должен работать {base_url}: {e}')
+           continue
+
+   print(all_links_info)
+   print('Парсинг закончен')
+
+   save_bad_document(error_links, BAD_CSV)
 
 parser()
