@@ -6,8 +6,8 @@ import requests  #для работы с запросами через рекв�
 from bs4 import BeautifulSoup #библиотека разбивает html страницу, делает из нее объекты с которыми мы дальше и будем работать
 import csv # создает csv файл
 
-CSV = 'all_main_info_about_separation_anxiety.csv'
-BAD_CSV = 'bad_link_separation_anxiety.csv'
+CSV = 'all_main_info.csv'
+BAD_CSV = 'all_bad_link.csv'
 HOST = 'https://www.psychforums.com/forum.html'
 HEADERS = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -45,21 +45,17 @@ def get_html(url, params= ''): #создаем функцию которая в�
 
 def get_content(html,url): #полусение конкретной информации в зависимости от того, какие параметры мы ввели в предыдущую функцию и что нам вернули
     soup = BeautifulSoup(html, 'html.parser') #создаем объект c входными данными
-
+    title = soup.find('div', id='page-body').find('h1')
     items = soup.find_all('div', class_=re.compile(r"^post bg")) # Еще два часа моей жизни
-
-    information_about_separation_anxiety = []
-
+    all_main_info = []
     forum_themes = soup.find('div', id="page-footer").find('li', class_="icon-home").find_all('a')
     # выносим все эдементы из аппента ибо я замаялась исправлять ошибки
     for item in items:
         #print(item)
         try:
-
             main_theme = forum_themes[2]
             second_theme = forum_themes[3]
             last_theme = forum_themes[4] if len(forum_themes) >= 4 else 'NULL'
-            title = item.find('h3', class_='first')
             text = item.find('div', class_='content')
             date = item.find('p', class_='author')
             if date:
@@ -71,13 +67,13 @@ def get_content(html,url): #полусение конкретной информ
                 if len(parts) > 1:
                     date = parts[1].strip() # Выведет: "Пн Ноя 14, 2022 1:09"
                 else:
-                    print("NULL")
+                    date = "NULL"
 
             id_user = item.find('dl', class_='postprofile')
             messages = item.find('dl', class_='postprofile').find_all('dd')
             count_messages = messages[2].get_text().replace('Posts: ', '')
 
-            information_about_separation_anxiety.append(
+            all_main_info.append(
                 {
                     'main_theme' : main_theme.get_text(strip=True) if main_theme else 'NULL',
                     'second_theme': second_theme.get_text(strip=True).replace(' Forum', '') if second_theme else 'NULL',
@@ -91,9 +87,9 @@ def get_content(html,url): #полусение конкретной информ
             )
             #print(information_about_separation_anxiety)
         except Exception as e:
-            print(f"Ошибка при обработке элемента на странице {url}: {e}")
+            #print(f"Ошибка при обработке элемента на странице {url}: {e}")
             continue
-    return information_about_separation_anxiety
+    return all_main_info
 
 def save_document(items, path):
     with open(path, 'w', encoding='utf-8', newline='') as file:
@@ -119,27 +115,26 @@ def read_from_document():
 def parser():
     read_from_document()
     #print(f"Всего ссылок для обработки: {len(URLS)}")
-    information_about_separation_anxiety = []
+    all_main_info = []
     error_links = []
     for url in range(len(URLS)):
+        percent_done = ((url + 1) / len(URLS)) * 100
+        print(f"Обработано {url} из {len(URLS)} ({percent_done:.2f}%)")
         try:
             html = get_html(URLS[url][0])
             if html.status_code == 200:
                 #print(url)
-                print(f'Пошла жара. Сысыслка номер: {URLS[url][0]}')
-                information_about_separation_anxiety.extend(get_content(html.text,url ))
-                print(information_about_separation_anxiety)
+                print(f'Пошла жара. Сысыслка номер:{url}, {URLS[url][0]}')
+                all_main_info.extend(get_content(html.text,url ))
+                save_document(all_main_info, CSV)
             else:
                 print('Ерроре')
                 error_links.append(URLS[url][0])
-                print(error_links)
 
         except Exception as e:
             print(f'У меня нет времени на ошибки. Я должен работать {URLS[url]}: {e}')
             continue
-        time.sleep(random.uniform(1, 3))
-    print(information_about_separation_anxiety)
+        time.sleep(random.uniform(1, 2))
     print('Парсинг закончен')
-    save_document(information_about_separation_anxiety, CSV)
     save_bad_document(error_links, BAD_CSV)
 parser()
